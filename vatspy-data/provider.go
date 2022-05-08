@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/vatsimnerd/perfetch"
 	"github.com/vatsimnerd/util/pubsub"
 )
@@ -37,6 +37,10 @@ const (
 	ObjectTypeFIR
 	ObjectTypeUIR
 	ObjectTypeAirportMeta
+)
+
+var (
+	log = logrus.WithField("module", "vatspy-data")
 )
 
 func New() *Provider {

@@ -5,10 +5,14 @@ import (
 	"strings"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	vatsimapi "github.com/vatsimnerd/simwatch-providers/vatsim-api"
 	vatspydata "github.com/vatsimnerd/simwatch-providers/vatspy-data"
 	"github.com/vatsimnerd/util/pubsub"
+)
+
+var (
+	log = logrus.WithField("module", "merged")
 )
 
 type Provider struct {
@@ -79,12 +83,14 @@ func (p *Provider) loop() {
 	dynamicStarted := false
 
 	static.Start()
+	defer static.Stop()
 
 	p.SetInitialNotifier(func(sub pubsub.Subscription) {
 		// initial notifier may take time and ponentially
 		// fill up the notification chan so we're gonna make it
 		// async to allow chan reading in another thread
 		go func() {
+			log.Debug("running initial notifier")
 			p.dataLock.RLock()
 			defer p.dataLock.RUnlock()
 			for _, arpt := range p.airports {
@@ -99,9 +105,15 @@ func (p *Provider) loop() {
 		}()
 	})
 
+loop:
 	for {
 		select {
 		case upd := <-ssub.Updates():
+			log.WithFields(logrus.Fields{
+				"uType": upd.UType,
+				"oType": upd.OType,
+				"obj":   upd.Obj,
+			}).Info("got update from vatspy data provider")
 			switch upd.UType {
 			case pubsub.UpdateTypeFin:
 				// static data is ready, starting dynamic
@@ -109,6 +121,7 @@ func (p *Provider) loop() {
 				if !dynamicStarted {
 					p.SetDataReady(true)
 					dynamic.Start()
+					defer dynamic.Stop()
 					dynamicStarted = true
 				}
 
@@ -177,6 +190,11 @@ func (p *Provider) loop() {
 				}
 			}
 		case upd := <-dsub.Updates():
+			log.WithFields(logrus.Fields{
+				"uType": upd.UType,
+				"oType": upd.OType,
+				"obj":   upd.Obj,
+			}).Info("got update from vatsim api provider")
 			switch upd.UType {
 			case pubsub.UpdateTypeFin:
 				p.Fin()
@@ -215,6 +233,8 @@ func (p *Provider) loop() {
 					p.deleteController(ctrl)
 				}
 			}
+		case <-p.stop:
+			break loop
 		}
 	}
 }
@@ -300,20 +320,19 @@ func (p *Provider) deleteAirport(am vatspydata.AirportMeta) {
 }
 
 func (p *Provider) setController(c vatsimapi.Controller) {
+	clog := log.WithField("callsign", c.Callsign)
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 
 	tokens := strings.Split(c.Callsign, "_")
 	prefix := tokens[0]
 
-	clog := log.WithField("callsign", c.Callsign)
-
 	if c.Facility == 0 {
 		clog.Debug("skipping ctrl with facility=0")
 		return
 	} else if c.Facility >= 1 && c.Facility <= 5 {
 
-		arpt, err := p.findAirport(prefix)
+		arpt, err := p.findAirportUnsafe(prefix)
 		if err != nil {
 			clog.Error("can't find airport for ctrl")
 			return
@@ -347,25 +366,28 @@ func (p *Provider) setController(c vatsimapi.Controller) {
 		update := pubsub.Update{UType: pubsub.UpdateTypeSet, OType: ObjectTypeAirport, Obj: arpt}
 		p.Notify(update)
 	} else if c.Facility == vatsimapi.FacilityRadar {
+		clog.Debug("processing radar")
+
 		firs := make(map[string]vatspydata.FIR, 0)
 		var model *vatspydata.FIR
 
-		fir, err := p.findFIR(prefix)
+		clog.Debug("searching for firs")
+		fir, err := p.findFIRUnsafe(prefix)
 		if err == nil {
 			firs[fir.ID] = fir
 			model = &fir
 		} else {
-			uir, err := p.findUIR(prefix)
+			uir, err := p.findUIRUnsafe(prefix)
 			if err == nil {
 				for _, firID := range uir.FIRIDs {
-					fir, err := p.findFIR(firID)
+					fir, err := p.findFIRUnsafe(firID)
 					if err == nil {
 						firs[fir.ID] = fir
 						if model == nil {
 							model = &fir
 						}
 					} else {
-						clog.WithFields(log.Fields{
+						clog.WithFields(logrus.Fields{
 							"fir": firID,
 							"uir": uir.ID,
 						}).Warn("can't find FIR provided by UIR")
@@ -413,7 +435,7 @@ func (p *Provider) deleteController(c vatsimapi.Controller) {
 		return
 	} else if c.Facility >= 1 && c.Facility <= 5 {
 
-		arpt, err := p.findAirport(prefix)
+		arpt, err := p.findAirportUnsafe(prefix)
 		if err != nil {
 			clog.Error("can't find airport for ctrl")
 			return
@@ -471,9 +493,7 @@ func (p *Provider) deletePilot(vp vatsimapi.Pilot) {
 	}
 }
 
-func (p *Provider) findAirport(id string) (Airport, error) {
-	p.dataLock.RLock()
-	defer p.dataLock.RUnlock()
+func (p *Provider) findAirportUnsafe(id string) (Airport, error) {
 	if arpt, found := p.airports[id]; found {
 		return arpt, nil
 	}
@@ -483,7 +503,7 @@ func (p *Provider) findAirport(id string) (Airport, error) {
 	return Airport{}, errNotFound
 }
 
-func (p *Provider) findFIR(id string) (vatspydata.FIR, error) {
+func (p *Provider) findFIRUnsafe(id string) (vatspydata.FIR, error) {
 	if fir, found := p.firs[id]; found {
 		return fir, nil
 	}
@@ -493,7 +513,7 @@ func (p *Provider) findFIR(id string) (vatspydata.FIR, error) {
 	return vatspydata.FIR{}, errNotFound
 }
 
-func (p *Provider) findUIR(id string) (vatspydata.UIR, error) {
+func (p *Provider) findUIRUnsafe(id string) (vatspydata.UIR, error) {
 	if uir, found := p.uirs[id]; found {
 		return uir, nil
 	}

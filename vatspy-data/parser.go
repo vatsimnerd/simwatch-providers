@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/vatsimnerd/util/mapupdate"
 	"github.com/vatsimnerd/util/pubsub"
 )

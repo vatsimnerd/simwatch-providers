@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/vatsimnerd/perfetch"
 	"github.com/vatsimnerd/util/mapupdate"
 	"github.com/vatsimnerd/util/pubsub"
@@ -34,6 +34,10 @@ const (
 
 	ObjectTypeController pubsub.ObjectType = iota + 1
 	ObjectTypePilot
+)
+
+var (
+	log = logrus.WithField("module", "vatsim-api")
 )
 
 func New() *Provider {

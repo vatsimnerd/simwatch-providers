@@ -3,7 +3,6 @@ package vatspydata
 import (
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geojson"
-	log "github.com/sirupsen/logrus"
 	"github.com/vatsimnerd/util/mapupdate"
 )
 
