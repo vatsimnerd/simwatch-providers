@@ -100,7 +100,7 @@ loop:
 	for {
 		select {
 		case raw := <-psub.Updates():
-			log.Info("got update from vatsim api poller")
+			log.Debug("got update from vatsim api poller")
 			data := Data{}
 
 			err := json.Unmarshal(raw, &data)

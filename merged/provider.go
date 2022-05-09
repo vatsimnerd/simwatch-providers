@@ -113,7 +113,7 @@ loop:
 				"uType": upd.UType,
 				"oType": upd.OType,
 				"obj":   upd.Obj,
-			}).Info("got update from vatspy data provider")
+			}).Debug("got update from vatspy data provider")
 			switch upd.UType {
 			case pubsub.UpdateTypeFin:
 				// static data is ready, starting dynamic
@@ -194,7 +194,7 @@ loop:
 				"uType": upd.UType,
 				"oType": upd.OType,
 				"obj":   upd.Obj,
-			}).Info("got update from vatsim api provider")
+			}).Debug("got update from vatsim api provider")
 			switch upd.UType {
 			case pubsub.UpdateTypeFin:
 				p.Fin()
