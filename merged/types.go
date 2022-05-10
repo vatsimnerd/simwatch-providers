@@ -38,6 +38,10 @@ func (a Airport) NE(o Airport) bool {
 		a.Controllers.NE(o.Controllers)
 }
 
+func (a Airport) IsControlled() bool {
+	return !a.Controllers.IsEmpty()
+}
+
 func (cs ControllerSet) NE(o ControllerSet) bool {
 	if (cs.ATIS == nil) != (o.ATIS == nil) || ((cs.ATIS != nil) && cs.ATIS.NE(*o.ATIS)) {
 		return true
@@ -55,6 +59,14 @@ func (cs ControllerSet) NE(o ControllerSet) bool {
 		return true
 	}
 	return false
+}
+
+func (cs ControllerSet) IsEmpty() bool {
+	return cs.ATIS == nil &&
+		cs.Delivery == nil &&
+		cs.Ground == nil &&
+		cs.Tower == nil &&
+		cs.Approach == nil
 }
 
 func (r Radar) NE(o Radar) bool {
