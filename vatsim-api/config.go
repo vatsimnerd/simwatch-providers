@@ -3,7 +3,7 @@ package vatsimapi
 import "time"
 
 type Config struct {
-	URL  string `mapstructure:"api_url,omitempty"`
+	URL  string `mapstructure:"url,omitempty"`
 	Poll struct {
 		Period  time.Duration `mapstructure:"period,omitempty"`
 		Timeout time.Duration `mapstructure:"timeout,omitempty"`
