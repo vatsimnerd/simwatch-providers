@@ -53,6 +53,9 @@ func New(apiConfig *vatsimapi.Config, dataConfig *vatspydata.Config) *Provider {
 		stop:     make(chan bool),
 		stopped:  false,
 
+		apiConfig:  apiConfig,
+		dataConfig: dataConfig,
+
 		airports:     make(map[string]Airport),
 		radars:       make(map[string]Radar),
 		pilots:       make(map[string]Pilot),
