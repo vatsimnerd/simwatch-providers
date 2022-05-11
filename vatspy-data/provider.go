@@ -12,6 +12,8 @@ import (
 type Provider struct {
 	*pubsub.Provider
 
+	cfg *Config
+
 	stop      chan bool
 	stopped   bool
 	bdrs      map[string]Boundaries
@@ -24,14 +26,8 @@ type Provider struct {
 }
 
 const (
-	dataURL       = "https://raw.githubusercontent.com/vatsimnetwork/vatspy-data-project/master/VATSpy.dat"
-	boundariesURL = "https://raw.githubusercontent.com/vatsimnetwork/vatspy-data-project/master/Boundaries.geojson"
-
-	period  = 24 * time.Hour
-	timeout = 5 * time.Second
-
-	bootstrapRetries         = 3
-	bootstrapRetriesCooldown = 3 * time.Second
+	DefaultDataURL       = "https://raw.githubusercontent.com/vatsimnetwork/vatspy-data-project/master/VATSpy.dat"
+	DefaultBoundariesURL = "https://raw.githubusercontent.com/vatsimnetwork/vatspy-data-project/master/Boundaries.geojson"
 
 	ObjectTypeCountry pubsub.ObjectType = 100 + iota
 	ObjectTypeFIR
@@ -43,9 +39,10 @@ var (
 	log = logrus.WithField("module", "vatspy-data")
 )
 
-func New() *Provider {
+func New(cfg *Config) *Provider {
 	return &Provider{
 		Provider:  pubsub.NewProvider(),
+		cfg:       cfg,
 		stop:      make(chan bool),
 		stopped:   false,
 		bdrs:      make(map[string]Boundaries),
@@ -91,24 +88,30 @@ func (p *Provider) loop() {
 		}()
 	})
 
-	bpoller := perfetch.New(period, perfetch.HTTPGetFetcher(boundariesURL, timeout))
-	dpoller := perfetch.New(period, perfetch.HTTPGetFetcher(dataURL, timeout))
+	bpoller := perfetch.New(
+		p.cfg.Poll.Period,
+		perfetch.HTTPGetFetcher(p.cfg.BoundariesURL, p.cfg.Poll.Timeout),
+	)
+	dpoller := perfetch.New(
+		p.cfg.Poll.Period,
+		perfetch.HTTPGetFetcher(p.cfg.DataURL, p.cfg.Poll.Timeout),
+	)
 
 	bsub := bpoller.Subscribe(10)
 	dsub := dpoller.Subscribe(10)
 
 	r := 0
-	for r < bootstrapRetries {
+	for r < p.cfg.Boot.Retries {
 		err := bpoller.Start()
 		if err == nil {
 			break
 		}
 		r++
-		log.WithError(err).WithField("retries_left", bootstrapRetries-r).Error("error fetching boundaries (initial)")
-		if r == bootstrapRetries {
+		log.WithError(err).WithField("retries_left", p.cfg.Boot.Retries-r).Error("error fetching boundaries (initial)")
+		if r == p.cfg.Boot.Retries {
 			log.Fatal("error fetching boundaries (initially), no retries left")
 		}
-		time.Sleep(bootstrapRetriesCooldown)
+		time.Sleep(p.cfg.Boot.RetryCooldown)
 	}
 	defer bpoller.Stop()
 
@@ -119,17 +122,17 @@ func (p *Provider) loop() {
 	}
 
 	r = 0
-	for r < bootstrapRetries {
+	for r < p.cfg.Boot.Retries {
 		err := dpoller.Start()
 		if err == nil {
 			break
 		}
 		r++
-		log.WithError(err).WithField("retries_left", bootstrapRetries-r).Error("error fetching data (initial)")
-		if r == bootstrapRetries {
+		log.WithError(err).WithField("retries_left", p.cfg.Boot.Retries-r).Error("error fetching data (initial)")
+		if r == p.cfg.Boot.Retries {
 			log.Fatal("error fetching data (initially), no retries left")
 		}
-		time.Sleep(bootstrapRetriesCooldown)
+		time.Sleep(p.cfg.Boot.RetryCooldown)
 	}
 
 	p.SetDataReady(true)

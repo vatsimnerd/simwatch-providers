@@ -18,6 +18,9 @@ var (
 type Provider struct {
 	*pubsub.Provider
 
+	apiConfig  *vatsimapi.Config
+	dataConfig *vatspydata.Config
+
 	stop    chan bool
 	stopped bool
 
@@ -44,7 +47,7 @@ var (
 	errNotFound = fmt.Errorf("not found")
 )
 
-func New() *Provider {
+func New(apiConfig *vatsimapi.Config, dataConfig *vatspydata.Config) *Provider {
 	return &Provider{
 		Provider: pubsub.NewProvider(),
 		stop:     make(chan bool),
@@ -75,10 +78,10 @@ func (p *Provider) Stop() {
 }
 
 func (p *Provider) loop() {
-	static := vatspydata.New()
+	static := vatspydata.New(p.dataConfig)
 	ssub := static.Subscribe(1024)
 
-	dynamic := vatsimapi.New()
+	dynamic := vatsimapi.New(p.apiConfig)
 	dsub := dynamic.Subscribe(1024)
 	dynamicStarted := false
 

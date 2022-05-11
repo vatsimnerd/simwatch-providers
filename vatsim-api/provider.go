@@ -15,6 +15,8 @@ import (
 type Provider struct {
 	*pubsub.Provider
 
+	cfg *Config
+
 	stop    chan bool
 	stopped bool
 
@@ -25,12 +27,7 @@ type Provider struct {
 }
 
 const (
-	apiURL  = "https://data.vatsim.net/v3/vatsim-data.json"
-	period  = 15 * time.Second
-	timeout = 3 * time.Second
-
-	bootstrapRetries         = 5
-	bootstrapRetriesCooldown = 3 * time.Second
+	VatsimAPIURL = "https://data.vatsim.net/v3/vatsim-data.json"
 
 	ObjectTypeController pubsub.ObjectType = iota + 1
 	ObjectTypePilot
@@ -40,9 +37,10 @@ var (
 	log = logrus.WithField("module", "vatsim-api")
 )
 
-func New() *Provider {
+func New(cfg *Config) *Provider {
 	return &Provider{
 		Provider:    pubsub.NewProvider(),
+		cfg:         cfg,
 		stop:        make(chan bool),
 		stopped:     false,
 		controllers: make(map[string]Controller),
@@ -63,7 +61,10 @@ func (p *Provider) Stop() {
 }
 
 func (p *Provider) loop() {
-	poller := perfetch.New(period, perfetch.HTTPGetFetcher(apiURL, timeout))
+	poller := perfetch.New(
+		p.cfg.Poll.Period,
+		perfetch.HTTPGetFetcher(p.cfg.URL, p.cfg.Poll.Timeout),
+	)
 	psub := poller.Subscribe(1024)
 	defer poller.Unsubscribe(psub)
 
@@ -82,17 +83,17 @@ func (p *Provider) loop() {
 	})
 
 	r := 0
-	for r < bootstrapRetries {
+	for r < p.cfg.Boot.Retries {
 		err := poller.Start()
 		if err == nil {
 			break
 		}
 		r++
-		log.WithError(err).WithField("retries_left", bootstrapRetries-r).Error("error fetching boundaries (initial)")
-		if r == bootstrapRetries {
+		log.WithError(err).WithField("retries_left", p.cfg.Boot.Retries-r).Error("error fetching boundaries (initial)")
+		if r == p.cfg.Boot.Retries {
 			log.Fatal("error fetching boundaries (initially), no retries left")
 		}
-		time.Sleep(bootstrapRetriesCooldown)
+		time.Sleep(p.cfg.Boot.RetryCooldown)
 	}
 	defer poller.Stop()
 
