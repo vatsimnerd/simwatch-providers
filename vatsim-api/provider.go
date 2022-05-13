@@ -114,7 +114,7 @@ loop:
 			for _, vctrl := range data.Controllers {
 				ctrl, err := makeController(vctrl)
 				if err != nil {
-					log.WithError(err).WithField("callsign", vctrl.Callsign).Debug("skipping invalid controller")
+					log.WithError(err).WithField("callsign", vctrl.Callsign).Trace("skipping invalid controller")
 					continue
 				}
 				controllers[ctrl.Callsign] = ctrl
@@ -124,7 +124,7 @@ loop:
 				vctrl.Facility = FacilityATIS
 				ctrl, err := makeController(vctrl)
 				if err != nil {
-					log.WithError(err).WithField("callsign", vctrl.Callsign).Debug("skipping invalid controller")
+					log.WithError(err).WithField("callsign", vctrl.Callsign).Trace("skipping invalid controller")
 					continue
 				}
 				controllers[ctrl.Callsign] = ctrl
@@ -134,7 +134,7 @@ loop:
 			for _, vpilot := range data.Pilots {
 				pilot, err := makePilot(vpilot)
 				if err != nil {
-					log.WithError(err).WithField("callsign", vpilot.Callsign).Debug("skipping invalid pilot")
+					log.WithError(err).WithField("callsign", vpilot.Callsign).Trace("skipping invalid pilot")
 					continue
 				}
 				pilots[pilot.Callsign] = pilot

@@ -246,21 +246,21 @@ loop:
 }
 
 func (p *Provider) setCountry(c vatspydata.Country) {
-	log.WithField("country", c.Prefix).Debug("setting country")
+	log.WithField("country", c.Prefix).Trace("setting country")
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 	p.countries[c.Prefix] = c
 }
 
 func (p *Provider) deleteCountry(c vatspydata.Country) {
-	log.WithField("country", c.Prefix).Debug("deleting country")
+	log.WithField("country", c.Prefix).Trace("deleting country")
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 	delete(p.countries, c.Prefix)
 }
 
 func (p *Provider) setFIR(f vatspydata.FIR) {
-	log.WithField("fir", f.ID).Debug("setting fir")
+	log.WithField("fir", f.ID).Trace("setting fir")
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 	p.firs[f.ID] = f
@@ -268,7 +268,7 @@ func (p *Provider) setFIR(f vatspydata.FIR) {
 }
 
 func (p *Provider) deleteFIR(f vatspydata.FIR) {
-	log.WithField("fir", f.ID).Debug("deleting fir")
+	log.WithField("fir", f.ID).Trace("deleting fir")
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 	if fir, found := p.firs[f.ID]; found {
@@ -278,21 +278,21 @@ func (p *Provider) deleteFIR(f vatspydata.FIR) {
 }
 
 func (p *Provider) setUIR(u vatspydata.UIR) {
-	log.WithField("uir", u.ID).Debug("setting uir")
+	log.WithField("uir", u.ID).Trace("setting uir")
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 	p.uirs[u.ID] = u
 }
 
 func (p *Provider) deleteUIR(u vatspydata.UIR) {
-	log.WithField("uir", u.ID).Debug("deleting uir")
+	log.WithField("uir", u.ID).Trace("deleting uir")
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 	delete(p.uirs, u.ID)
 }
 
 func (p *Provider) setAirport(am vatspydata.AirportMeta) {
-	log.WithField("arpt", am.ICAO).Debug("setting airport")
+	log.WithField("arpt", am.ICAO).Trace("setting airport")
 	var arpt Airport
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
@@ -313,7 +313,7 @@ func (p *Provider) setAirport(am vatspydata.AirportMeta) {
 }
 
 func (p *Provider) deleteAirport(am vatspydata.AirportMeta) {
-	log.WithField("arpt", am.ICAO).Debug("deleting airport")
+	log.WithField("arpt", am.ICAO).Trace("deleting airport")
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 
@@ -334,7 +334,7 @@ func (p *Provider) setController(c vatsimapi.Controller) {
 	prefix := tokens[0]
 
 	if c.Facility == 0 {
-		clog.Debug("skipping ctrl with facility=0")
+		clog.Trace("skipping ctrl with facility=0")
 		return
 	} else if c.Facility >= 1 && c.Facility <= 5 {
 
@@ -350,34 +350,33 @@ func (p *Provider) setController(c vatsimapi.Controller) {
 		case vatsimapi.FacilityATIS:
 			arpt.Controllers.ATIS = &c
 			c.HumanReadable = fmt.Sprintf("%s ATIS", arpt.Meta.Name)
-			alog.Debug("atis set")
+			alog.Trace("atis set")
 		case vatsimapi.FacilityDelivery:
 			arpt.Controllers.Delivery = &c
 			c.HumanReadable = fmt.Sprintf("%s Delivery", arpt.Meta.Name)
-			alog.Debug("delivery set")
+			alog.Trace("delivery set")
 		case vatsimapi.FacilityGround:
 			arpt.Controllers.Ground = &c
 			c.HumanReadable = fmt.Sprintf("%s Ground", arpt.Meta.Name)
-			alog.Debug("ground set")
+			alog.Trace("ground set")
 		case vatsimapi.FacilityTower:
 			arpt.Controllers.Tower = &c
 			c.HumanReadable = fmt.Sprintf("%s Tower", arpt.Meta.Name)
-			alog.Debug("tower set")
+			alog.Trace("tower set")
 		case vatsimapi.FacilityApproach:
 			arpt.Controllers.Approach = &c
 			c.HumanReadable = fmt.Sprintf("%s Approach", arpt.Meta.Name)
-			alog.Debug("approach set")
+			alog.Trace("approach set")
 		}
 
 		update := pubsub.Update{UType: pubsub.UpdateTypeSet, OType: ObjectTypeAirport, Obj: arpt}
 		p.Notify(update)
 	} else if c.Facility == vatsimapi.FacilityRadar {
-		clog.Debug("processing radar")
 
 		firs := make(map[string]vatspydata.FIR, 0)
 		var model *vatspydata.FIR
 
-		clog.Debug("searching for firs")
+		clog.Trace("searching for firs")
 		fir, err := p.findFIRUnsafe(prefix)
 		if err == nil {
 			firs[fir.ID] = fir
@@ -437,7 +436,7 @@ func (p *Provider) deleteController(c vatsimapi.Controller) {
 	clog := log.WithField("callsign", c.Callsign)
 
 	if c.Facility == 0 {
-		clog.Debug("skipping ctrl with facility=0")
+		clog.Trace("skipping ctrl with facility=0")
 		return
 	} else if c.Facility >= 1 && c.Facility <= 5 {
 
@@ -452,19 +451,19 @@ func (p *Provider) deleteController(c vatsimapi.Controller) {
 		switch c.Facility {
 		case vatsimapi.FacilityATIS:
 			arpt.Controllers.ATIS = nil
-			alog.Debug("atis removed")
+			alog.Trace("atis removed")
 		case vatsimapi.FacilityDelivery:
 			arpt.Controllers.Delivery = nil
-			alog.Debug("delivery removed")
+			alog.Trace("delivery removed")
 		case vatsimapi.FacilityGround:
 			arpt.Controllers.Ground = nil
-			alog.Debug("ground removed")
+			alog.Trace("ground removed")
 		case vatsimapi.FacilityTower:
 			arpt.Controllers.Tower = nil
-			alog.Debug("tower removed")
+			alog.Trace("tower removed")
 		case vatsimapi.FacilityApproach:
 			arpt.Controllers.Approach = nil
-			alog.Debug("approach removed")
+			alog.Trace("approach removed")
 		}
 		update := pubsub.Update{UType: pubsub.UpdateTypeDelete, OType: ObjectTypeAirport, Obj: arpt}
 		p.Notify(update)
