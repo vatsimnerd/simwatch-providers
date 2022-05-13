@@ -111,15 +111,19 @@ func (p *Provider) loop() {
 		}()
 	})
 
+	count := 0
+
 loop:
 	for {
 		select {
 		case upd := <-ssub.Updates():
+
 			log.WithFields(logrus.Fields{
 				"uType": upd.UType,
 				"oType": upd.OType,
 				"obj":   upd.Obj,
 			}).Debug("got update from vatspy data provider")
+
 			switch upd.UType {
 			case pubsub.UpdateTypeFin:
 				// static data is ready, starting dynamic
@@ -196,11 +200,14 @@ loop:
 				}
 			}
 		case upd := <-dsub.Updates():
-			log.WithFields(logrus.Fields{
-				"uType": upd.UType,
-				"oType": upd.OType,
-				"obj":   upd.Obj,
-			}).Debug("got update from vatsim api provider")
+			count++
+			if count%100 == 0 {
+				log.WithFields(logrus.Fields{
+					"uType": upd.UType,
+					"oType": upd.OType,
+					"obj":   upd.Obj,
+				}).Debugf("accumulated %d updates from vatsim api provider", count)
+			}
 			switch upd.UType {
 			case pubsub.UpdateTypeFin:
 				p.Fin()
