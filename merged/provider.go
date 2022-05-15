@@ -118,7 +118,7 @@ loop:
 		select {
 		case upd := <-ssub.Updates():
 			staticCount++
-			if staticCount%100 == 0 {
+			if staticCount%1000 == 0 {
 				log.Debugf("accumulated %d updates from vatspy data provider", staticCount)
 			}
 
@@ -199,7 +199,7 @@ loop:
 			}
 		case upd := <-dsub.Updates():
 			dynamicCount++
-			if dynamicCount%100 == 0 {
+			if dynamicCount%1000 == 0 {
 				log.Debugf("accumulated %d updates from vatsim api provider", dynamicCount)
 			}
 			switch upd.UType {
