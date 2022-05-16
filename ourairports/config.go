@@ -1,4 +1,4 @@
-package vatsimapi
+package ourairports
 
 import (
 	simwatchproviders "github.com/vatsimnerd/simwatch-providers"
