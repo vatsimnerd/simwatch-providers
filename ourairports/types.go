@@ -19,3 +19,17 @@ type Runway struct {
 	ActiveTO    bool    `json:"active_to"`
 	ActiveLnd   bool    `json:"active_lnd"`
 }
+
+func (r Runway) NE(o Runway) bool {
+	return r.ICAO != o.ICAO ||
+		r.LengthFt != o.LengthFt ||
+		r.WidthFt != o.WidthFt ||
+		r.Surface != o.Surface ||
+		r.Lighted != o.Lighted ||
+		r.Closed != o.Closed ||
+		r.Ident != o.Ident ||
+		r.Latitude != o.Latitude ||
+		r.Longitude != o.Longitude ||
+		r.ElevationFt != o.ElevationFt ||
+		r.Heading != o.Heading
+}

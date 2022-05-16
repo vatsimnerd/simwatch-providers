@@ -1,6 +1,7 @@
 package merged
 
 import (
+	"github.com/vatsimnerd/simwatch-providers/ourairports"
 	vatsimapi "github.com/vatsimnerd/simwatch-providers/vatsim-api"
 	vatspydata "github.com/vatsimnerd/simwatch-providers/vatspy-data"
 )
@@ -19,8 +20,9 @@ type (
 	}
 
 	Airport struct {
-		Meta        vatspydata.AirportMeta `json:"meta"`
-		Controllers ControllerSet          `json:"ctrls"`
+		Meta        vatspydata.AirportMeta        `json:"meta"`
+		Controllers ControllerSet                 `json:"ctrls"`
+		Runways     map[string]ourairports.Runway `json:"rwys"`
 	}
 
 	Radar struct {

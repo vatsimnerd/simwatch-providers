@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
+	"github.com/vatsimnerd/simwatch-providers/ourairports"
 	vatsimapi "github.com/vatsimnerd/simwatch-providers/vatsim-api"
 	vatspydata "github.com/vatsimnerd/simwatch-providers/vatspy-data"
 	"github.com/vatsimnerd/util/pubsub"
@@ -20,6 +21,7 @@ type Provider struct {
 
 	apiConfig  *vatsimapi.Config
 	dataConfig *vatspydata.Config
+	oaConfig   *ourairports.Config
 
 	stop    chan bool
 	stopped bool
@@ -47,7 +49,7 @@ var (
 	errNotFound = fmt.Errorf("not found")
 )
 
-func New(apiConfig *vatsimapi.Config, dataConfig *vatspydata.Config) *Provider {
+func New(apiConfig *vatsimapi.Config, dataConfig *vatspydata.Config, oaConfig *ourairports.Config) *Provider {
 	return &Provider{
 		Provider: pubsub.NewProvider(),
 		stop:     make(chan bool),
@@ -55,6 +57,7 @@ func New(apiConfig *vatsimapi.Config, dataConfig *vatspydata.Config) *Provider {
 
 		apiConfig:  apiConfig,
 		dataConfig: dataConfig,
+		oaConfig:   oaConfig,
 
 		airports:     make(map[string]Airport),
 		radars:       make(map[string]Radar),
@@ -82,10 +85,13 @@ func (p *Provider) Stop() {
 
 func (p *Provider) loop() {
 	static := vatspydata.New(p.dataConfig)
-	ssub := static.Subscribe(1024)
+	ssub := static.Subscribe(32768)
 
 	dynamic := vatsimapi.New(p.apiConfig)
-	dsub := dynamic.Subscribe(1024)
+	dsub := dynamic.Subscribe(32768)
+
+	runways := ourairports.New(p.oaConfig)
+	rsub := runways.Subscribe(32768)
 	dynamicStarted := false
 
 	static.Start()
@@ -113,6 +119,7 @@ func (p *Provider) loop() {
 
 	staticCount := 0
 	dynamicCount := 0
+	runwayCount := 0
 loop:
 	for {
 		select {
@@ -124,12 +131,15 @@ loop:
 
 			switch upd.UType {
 			case pubsub.UpdateTypeFin:
-				// static data is ready, starting dynamic
-				log.Info("initial static data ready, starting dynamic provider")
 				if !dynamicStarted {
+					// static data is ready, starting dynamic
 					p.SetDataReady(true)
+					log.Info("initial static data ready, starting dynamic provider")
 					dynamic.Start()
 					defer dynamic.Stop()
+					log.Info("initial static data ready, starting ourairports provider")
+					runways.Start()
+					defer runways.Stop()
 					dynamicStarted = true
 				}
 
@@ -196,6 +206,20 @@ loop:
 					}
 					p.deleteUIR(uir)
 				}
+			}
+		case upd := <-rsub.Updates():
+			runwayCount++
+			if runwayCount%1000 == 0 {
+				log.Debugf("accumulated %d updates from ourairports provider", dynamicCount)
+			}
+			switch upd.UType {
+			case pubsub.UpdateTypeSet:
+				if rwy, ok := upd.Obj.(ourairports.Runway); ok {
+					p.setRunway(rwy)
+				} else {
+					log.Error("object is expected to be Runway, got %T", upd.Obj)
+				}
+
 			}
 		case upd := <-dsub.Updates():
 			dynamicCount++
@@ -304,7 +328,7 @@ func (p *Provider) setAirport(am vatspydata.AirportMeta) {
 		delete(p.airports, ex.Meta.ICAO)
 		delete(p.airportsIata, ex.Meta.IATA)
 	} else {
-		arpt = Airport{Meta: am}
+		arpt = Airport{Meta: am, Runways: make(map[string]ourairports.Runway)}
 	}
 
 	p.airports[arpt.Meta.ICAO] = arpt
@@ -495,6 +519,30 @@ func (p *Provider) deletePilot(vp vatsimapi.Pilot) {
 	if ex, found := p.pilots[vp.Callsign]; found {
 		delete(p.pilots, vp.Callsign)
 		update := pubsub.Update{UType: pubsub.UpdateTypeDelete, OType: ObjectTypePilot, Obj: ex}
+		p.Notify(update)
+	}
+}
+
+func (p *Provider) setRunway(rwy ourairports.Runway) {
+	p.dataLock.Lock()
+	defer p.dataLock.Unlock()
+	arpt, err := p.findAirportUnsafe(rwy.ICAO)
+	if err != nil {
+		// Airport not found means it won't be
+		// Runways are parsed after all airports have been loaded
+		return
+	}
+
+	if ex, found := arpt.Runways[rwy.Ident]; !found || ex.NE(rwy) {
+		if found {
+			// copy active flags from existing runway
+			rwy.ActiveTO = ex.ActiveTO
+			rwy.ActiveLnd = ex.ActiveLnd
+		} else {
+			// Check for ATIS and detect active flags
+		}
+		arpt.Runways[rwy.Ident] = rwy
+		update := pubsub.Update{UType: pubsub.UpdateTypeSet, OType: ObjectTypeAirport, Obj: arpt}
 		p.Notify(update)
 	}
 }

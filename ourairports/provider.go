@@ -87,6 +87,7 @@ func (p *Provider) loop() {
 						p.Notify(update)
 					}
 				}
+				p.Fin()
 			}()
 		})
 
@@ -120,7 +121,7 @@ loop:
 	for {
 		select {
 		case raw := <-rawChan:
-			log.Debug("got update from vatsim api poller")
+			log.Debug("got update from ourairport poller")
 			p.parseRunways(raw)
 		case <-p.stop:
 			break loop
@@ -136,7 +137,7 @@ func (p *Provider) parseRunways(data []byte) {
 		line := sc.Text()
 		r1, r2, err := parseRunway(line)
 		if err != nil {
-			l.WithError(err).Debug("error parsing runway")
+			l.WithError(err).Trace("error parsing runway")
 			continue
 		}
 
@@ -170,5 +171,6 @@ func (p *Provider) parseRunways(data []byte) {
 
 		p.dataLock.Unlock()
 	}
+	p.Fin()
 	p.SetDataReady(true)
 }
