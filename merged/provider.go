@@ -148,28 +148,28 @@ loop:
 				case vatspydata.ObjectTypeCountry:
 					country, ok := upd.Obj.(vatspydata.Country)
 					if !ok {
-						log.Error("object is expected to be Country, got %T", upd.Obj)
+						log.Errorf("object is expected to be Country, got %T", upd.Obj)
 						continue
 					}
 					p.setCountry(country)
 				case vatspydata.ObjectTypeAirportMeta:
 					am, ok := upd.Obj.(vatspydata.AirportMeta)
 					if !ok {
-						log.Error("object is expected to be AirportMeta, got %T", upd.Obj)
+						log.Errorf("object is expected to be AirportMeta, got %T", upd.Obj)
 						continue
 					}
 					p.setAirport(am)
 				case vatspydata.ObjectTypeFIR:
 					fir, ok := upd.Obj.(vatspydata.FIR)
 					if !ok {
-						log.Error("object is expected to be FIR, got %T", upd.Obj)
+						log.Errorf("object is expected to be FIR, got %T", upd.Obj)
 						continue
 					}
 					p.setFIR(fir)
 				case vatspydata.ObjectTypeUIR:
 					uir, ok := upd.Obj.(vatspydata.UIR)
 					if !ok {
-						log.Error("object is expected to be UIR, got %T", upd.Obj)
+						log.Errorf("object is expected to be UIR, got %T", upd.Obj)
 						continue
 					}
 					p.setUIR(uir)
@@ -180,28 +180,28 @@ loop:
 				case vatspydata.ObjectTypeCountry:
 					country, ok := upd.Obj.(vatspydata.Country)
 					if !ok {
-						log.Error("object is expected to be Country, got %T", upd.Obj)
+						log.Errorf("object is expected to be Country, got %T", upd.Obj)
 						continue
 					}
 					p.deleteCountry(country)
 				case vatspydata.ObjectTypeAirportMeta:
 					am, ok := upd.Obj.(vatspydata.AirportMeta)
 					if !ok {
-						log.Error("object is expected to be AirportMeta, got %T", upd.Obj)
+						log.Errorf("object is expected to be AirportMeta, got %T", upd.Obj)
 						continue
 					}
 					p.deleteAirport(am)
 				case vatspydata.ObjectTypeFIR:
 					fir, ok := upd.Obj.(vatspydata.FIR)
 					if !ok {
-						log.Error("object is expected to be FIR, got %T", upd.Obj)
+						log.Errorf("object is expected to be FIR, got %T", upd.Obj)
 						continue
 					}
 					p.deleteFIR(fir)
 				case vatspydata.ObjectTypeUIR:
 					uir, ok := upd.Obj.(vatspydata.UIR)
 					if !ok {
-						log.Error("object is expected to be UIR, got %T", upd.Obj)
+						log.Errorf("object is expected to be UIR, got %T", upd.Obj)
 						continue
 					}
 					p.deleteUIR(uir)
@@ -217,7 +217,7 @@ loop:
 				if rwy, ok := upd.Obj.(ourairports.Runway); ok {
 					p.setRunway(rwy)
 				} else {
-					log.Error("object is expected to be Runway, got %T", upd.Obj)
+					log.Errorf("object is expected to be Runway, got %T", upd.Obj)
 				}
 
 			}
@@ -234,14 +234,14 @@ loop:
 				case vatsimapi.ObjectTypePilot:
 					pilot, ok := upd.Obj.(vatsimapi.Pilot)
 					if !ok {
-						log.Error("object is expected to be Pilot, got %T", upd.Obj)
+						log.Errorf("object is expected to be Pilot, got %T", upd.Obj)
 						continue
 					}
 					p.setPilot(pilot)
 				case vatsimapi.ObjectTypeController:
 					ctrl, ok := upd.Obj.(vatsimapi.Controller)
 					if !ok {
-						log.Error("object is expected to be Controller, got %T", upd.Obj)
+						log.Errorf("object is expected to be Controller, got %T", upd.Obj)
 						continue
 					}
 					p.setController(ctrl)
@@ -251,14 +251,14 @@ loop:
 				case vatsimapi.ObjectTypePilot:
 					pilot, ok := upd.Obj.(vatsimapi.Pilot)
 					if !ok {
-						log.Error("object is expected to be Pilot, got %T", upd.Obj)
+						log.Errorf("object is expected to be Pilot, got %T", upd.Obj)
 						continue
 					}
 					p.deletePilot(pilot)
 				case vatsimapi.ObjectTypeController:
 					ctrl, ok := upd.Obj.(vatsimapi.Controller)
 					if !ok {
-						log.Error("object is expected to be Controller, got %T", upd.Obj)
+						log.Errorf("object is expected to be Controller, got %T", upd.Obj)
 						continue
 					}
 					p.deleteController(ctrl)
@@ -375,6 +375,7 @@ func (p *Provider) setController(c vatsimapi.Controller) {
 		case vatsimapi.FacilityATIS:
 			arpt.Controllers.ATIS = &c
 			c.HumanReadable = fmt.Sprintf("%s ATIS", arpt.Meta.Name)
+			arpt.setActiveRunways()
 			alog.Trace("atis set")
 		case vatsimapi.FacilityDelivery:
 			arpt.Controllers.Delivery = &c
@@ -476,6 +477,7 @@ func (p *Provider) deleteController(c vatsimapi.Controller) {
 		switch c.Facility {
 		case vatsimapi.FacilityATIS:
 			arpt.Controllers.ATIS = nil
+			arpt.setActiveRunways()
 			alog.Trace("atis removed")
 		case vatsimapi.FacilityDelivery:
 			arpt.Controllers.Delivery = nil
@@ -533,15 +535,20 @@ func (p *Provider) setRunway(rwy ourairports.Runway) {
 		return
 	}
 
+	needActiveRunways := false
 	if ex, found := arpt.Runways[rwy.Ident]; !found || ex.NE(rwy) {
 		if found {
 			// copy active flags from existing runway
 			rwy.ActiveTO = ex.ActiveTO
 			rwy.ActiveLnd = ex.ActiveLnd
 		} else {
+			needActiveRunways = true
 			// Check for ATIS and detect active flags
 		}
 		arpt.Runways[rwy.Ident] = rwy
+		if needActiveRunways {
+			arpt.setActiveRunways()
+		}
 		update := pubsub.Update{UType: pubsub.UpdateTypeSet, OType: ObjectTypeAirport, Obj: arpt}
 		p.Notify(update)
 	}
