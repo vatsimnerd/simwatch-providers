@@ -345,7 +345,7 @@ func (p *Provider) setAirport(am vatspydata.AirportMeta) {
 		if p.airportTrace.Has(am.ICAO) {
 			l.Info("creating new airport")
 		}
-		arpt = Airport{Meta: am, Runways: make(map[string]ourairports.Runway)}
+		arpt = Airport{Meta: am, Runways: make(map[string]*ourairports.Runway)}
 	}
 
 	p.airports[arpt.Meta.ICAO] = arpt
@@ -629,7 +629,7 @@ func (p *Provider) setRunway(rwy ourairports.Runway) {
 			needActiveRunways = true
 			// Check for ATIS and detect active flags
 		}
-		arpt.Runways[rwy.Ident] = rwy
+		arpt.Runways[rwy.Ident] = &rwy
 		if needActiveRunways {
 			if trace {
 				l.Info("running setActiveRunways")

@@ -120,6 +120,7 @@ func (a *Airport) setActiveRunways() {
 	atisText := normalizeAtisText(a.Controllers.ATIS.TextAtis)
 
 	runways := detectArrivalRunways(atisText)
+
 	for ident, rwy := range a.Runways {
 		rwy.ActiveLnd = runways.Has(ident)
 	}

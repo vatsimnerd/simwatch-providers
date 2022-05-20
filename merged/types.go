@@ -20,9 +20,9 @@ type (
 	}
 
 	Airport struct {
-		Meta        vatspydata.AirportMeta        `json:"meta"`
-		Controllers ControllerSet                 `json:"ctrls"`
-		Runways     map[string]ourairports.Runway `json:"rwys"`
+		Meta        vatspydata.AirportMeta         `json:"meta"`
+		Controllers ControllerSet                  `json:"ctrls"`
+		Runways     map[string]*ourairports.Runway `json:"rwys"`
 	}
 
 	Radar struct {
