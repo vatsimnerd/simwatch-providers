@@ -408,6 +408,10 @@ func (p *Provider) setController(c vatsimapi.Controller) {
 		trace := p.airportTrace.Has(icao)
 		alog := clog.WithField("icao", icao)
 
+		if trace {
+			alog.WithField("arpt", arpt).Info("airport found")
+		}
+
 		traceLog := alog.Trace
 		if trace {
 			traceLog = alog.Info
@@ -437,10 +441,14 @@ func (p *Provider) setController(c vatsimapi.Controller) {
 			traceLog("approach set")
 		}
 
+		p.airports[arpt.Meta.ICAO] = arpt
+		p.airportsIata[arpt.Meta.IATA] = arpt
+
 		update := pubsub.Update{UType: pubsub.UpdateTypeSet, OType: ObjectTypeAirport, Obj: arpt}
 		if trace {
 			alog.WithField("update", update).Info("update generated")
 		}
+
 		p.Notify(update)
 	} else if c.Facility == vatsimapi.FacilityRadar {
 
