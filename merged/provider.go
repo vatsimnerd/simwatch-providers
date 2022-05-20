@@ -10,6 +10,7 @@ import (
 	vatsimapi "github.com/vatsimnerd/simwatch-providers/vatsim-api"
 	vatspydata "github.com/vatsimnerd/simwatch-providers/vatspy-data"
 	"github.com/vatsimnerd/util/pubsub"
+	"github.com/vatsimnerd/util/set"
 )
 
 var (
@@ -35,6 +36,8 @@ type Provider struct {
 	firs       map[string]vatspydata.FIR
 	firsPrefix map[string]vatspydata.FIR
 	uirs       map[string]vatspydata.UIR
+
+	airportTrace *set.SafeSet[string]
 
 	dataLock sync.RWMutex
 }
@@ -68,6 +71,8 @@ func New(apiConfig *vatsimapi.Config, dataConfig *vatspydata.Config, oaConfig *o
 		firs:       make(map[string]vatspydata.FIR),
 		firsPrefix: make(map[string]vatspydata.FIR),
 		uirs:       make(map[string]vatspydata.UIR),
+
+		airportTrace: set.NewSafe[string](),
 	}
 }
 
@@ -317,41 +322,71 @@ func (p *Provider) deleteUIR(u vatspydata.UIR) {
 }
 
 func (p *Provider) setAirport(am vatspydata.AirportMeta) {
-	log.WithField("arpt", am.ICAO).Trace("setting airport")
+	l := log.WithFields(logrus.Fields{"icao": am.ICAO, "func": "setAirport"})
+	if p.airportTrace.Has(am.ICAO) {
+		l.Info("setting airport")
+	} else {
+		l.Trace("setting airport")
+	}
+
 	var arpt Airport
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 
 	if ex, found := p.airports[am.ICAO]; found {
+		if p.airportTrace.Has(am.ICAO) {
+			l.WithField("ex", ex).Info("existing airport found")
+		}
 		arpt = ex
 		arpt.Meta = am
 		delete(p.airports, ex.Meta.ICAO)
 		delete(p.airportsIata, ex.Meta.IATA)
 	} else {
+		if p.airportTrace.Has(am.ICAO) {
+			l.Info("creating new airport")
+		}
 		arpt = Airport{Meta: am, Runways: make(map[string]ourairports.Runway)}
 	}
 
 	p.airports[arpt.Meta.ICAO] = arpt
 	p.airportsIata[arpt.Meta.IATA] = arpt
 	update := pubsub.Update{UType: pubsub.UpdateTypeSet, OType: ObjectTypeAirport, Obj: arpt}
+	if p.airportTrace.Has(am.ICAO) {
+		l.WithField("update", update).Info("update generated")
+	}
 	p.Notify(update)
 }
 
 func (p *Provider) deleteAirport(am vatspydata.AirportMeta) {
-	log.WithField("arpt", am.ICAO).Trace("deleting airport")
+	l := log.WithFields(logrus.Fields{"icao": am.ICAO, "func": "deleteAirport"})
+	if p.airportTrace.Has(am.ICAO) {
+		l.Info("deleting airport")
+	} else {
+		l.Trace("deleting airport")
+	}
+
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 
 	if ex, found := p.airports[am.ICAO]; found {
+		if p.airportTrace.Has(am.ICAO) {
+			l.WithField("ex", ex).Info("existing airport found")
+		}
 		delete(p.airports, ex.Meta.ICAO)
 		delete(p.airportsIata, ex.Meta.IATA)
 		update := pubsub.Update{UType: pubsub.UpdateTypeDelete, OType: ObjectTypeAirport, Obj: ex}
+		if p.airportTrace.Has(am.ICAO) {
+			l.WithField("update", update).Info("update generated")
+		}
 		p.Notify(update)
 	}
 }
 
 func (p *Provider) setController(c vatsimapi.Controller) {
-	clog := log.WithField("callsign", c.Callsign)
+	clog := log.WithFields(logrus.Fields{
+		"callsign": c.Callsign,
+		"func":     "setController",
+	})
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 
@@ -369,33 +404,43 @@ func (p *Provider) setController(c vatsimapi.Controller) {
 			return
 		}
 
-		alog := clog.WithField("icao", arpt.Meta.ICAO)
+		icao := arpt.Meta.ICAO
+		trace := p.airportTrace.Has(icao)
+		alog := clog.WithField("icao", icao)
+
+		traceLog := alog.Trace
+		if trace {
+			traceLog = alog.Info
+		}
 
 		switch c.Facility {
 		case vatsimapi.FacilityATIS:
 			arpt.Controllers.ATIS = &c
 			c.HumanReadable = fmt.Sprintf("%s ATIS", arpt.Meta.Name)
 			arpt.setActiveRunways()
-			alog.Trace("atis set")
+			traceLog("atis set")
 		case vatsimapi.FacilityDelivery:
 			arpt.Controllers.Delivery = &c
 			c.HumanReadable = fmt.Sprintf("%s Delivery", arpt.Meta.Name)
-			alog.Trace("delivery set")
+			traceLog("delivery set")
 		case vatsimapi.FacilityGround:
 			arpt.Controllers.Ground = &c
 			c.HumanReadable = fmt.Sprintf("%s Ground", arpt.Meta.Name)
-			alog.Trace("ground set")
+			traceLog("ground set")
 		case vatsimapi.FacilityTower:
 			arpt.Controllers.Tower = &c
 			c.HumanReadable = fmt.Sprintf("%s Tower", arpt.Meta.Name)
-			alog.Trace("tower set")
+			traceLog("tower set")
 		case vatsimapi.FacilityApproach:
 			arpt.Controllers.Approach = &c
 			c.HumanReadable = fmt.Sprintf("%s Approach", arpt.Meta.Name)
-			alog.Trace("approach set")
+			traceLog("approach set")
 		}
 
 		update := pubsub.Update{UType: pubsub.UpdateTypeSet, OType: ObjectTypeAirport, Obj: arpt}
+		if trace {
+			alog.WithField("update", update).Info("update generated")
+		}
 		p.Notify(update)
 	} else if c.Facility == vatsimapi.FacilityRadar {
 
@@ -453,13 +498,15 @@ func (p *Provider) setController(c vatsimapi.Controller) {
 }
 
 func (p *Provider) deleteController(c vatsimapi.Controller) {
+	clog := log.WithFields(logrus.Fields{
+		"callsign": c.Callsign,
+		"func":     "deleteController",
+	})
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 
 	tokens := strings.Split(c.Callsign, "_")
 	prefix := tokens[0]
-
-	clog := log.WithField("callsign", c.Callsign)
 
 	if c.Facility == 0 {
 		clog.Trace("skipping ctrl with facility=0")
@@ -472,27 +519,37 @@ func (p *Provider) deleteController(c vatsimapi.Controller) {
 			return
 		}
 
-		alog := clog.WithField("icao", arpt.Meta.ICAO)
+		icao := arpt.Meta.ICAO
+		trace := p.airportTrace.Has(icao)
+		alog := clog.WithField("icao", icao)
+
+		traceLog := alog.Trace
+		if trace {
+			traceLog = alog.Info
+		}
 
 		switch c.Facility {
 		case vatsimapi.FacilityATIS:
 			arpt.Controllers.ATIS = nil
 			arpt.setActiveRunways()
-			alog.Trace("atis removed")
+			traceLog("atis removed")
 		case vatsimapi.FacilityDelivery:
 			arpt.Controllers.Delivery = nil
-			alog.Trace("delivery removed")
+			traceLog("delivery removed")
 		case vatsimapi.FacilityGround:
 			arpt.Controllers.Ground = nil
-			alog.Trace("ground removed")
+			traceLog("ground removed")
 		case vatsimapi.FacilityTower:
 			arpt.Controllers.Tower = nil
-			alog.Trace("tower removed")
+			traceLog("tower removed")
 		case vatsimapi.FacilityApproach:
 			arpt.Controllers.Approach = nil
-			alog.Trace("approach removed")
+			traceLog("approach removed")
 		}
 		update := pubsub.Update{UType: pubsub.UpdateTypeDelete, OType: ObjectTypeAirport, Obj: arpt}
+		if trace {
+			alog.WithField("update", update).Info("update generated")
+		}
 		p.Notify(update)
 	} else if c.Facility == vatsimapi.FacilityRadar {
 		if radar, found := p.radars[c.Callsign]; found {
@@ -526,30 +583,55 @@ func (p *Provider) deletePilot(vp vatsimapi.Pilot) {
 }
 
 func (p *Provider) setRunway(rwy ourairports.Runway) {
+	l := log.WithFields(logrus.Fields{
+		"icao":  rwy.ICAO,
+		"ident": rwy.Ident,
+		"func":  "setRunway",
+	})
+
+	trace := p.airportTrace.Has(rwy.ICAO)
+
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 	arpt, err := p.findAirportUnsafe(rwy.ICAO)
 	if err != nil {
 		// Airport not found means it won't be
 		// Runways are parsed after all airports have been loaded
+		if trace {
+			l.Info("airport not found")
+		}
 		return
 	}
+
+	l = l.WithField("arpt", arpt)
 
 	needActiveRunways := false
 	if ex, found := arpt.Runways[rwy.Ident]; !found || ex.NE(rwy) {
 		if found {
+			if trace {
+				l.WithField("ex", ex).Info("found existing runway")
+			}
 			// copy active flags from existing runway
 			rwy.ActiveTO = ex.ActiveTO
 			rwy.ActiveLnd = ex.ActiveLnd
 		} else {
+			if trace {
+				l.Info("no existing runway found")
+			}
 			needActiveRunways = true
 			// Check for ATIS and detect active flags
 		}
 		arpt.Runways[rwy.Ident] = rwy
 		if needActiveRunways {
+			if trace {
+				l.Info("running setActiveRunways")
+			}
 			arpt.setActiveRunways()
 		}
 		update := pubsub.Update{UType: pubsub.UpdateTypeSet, OType: ObjectTypeAirport, Obj: arpt}
+		if trace {
+			l.WithField("update", update).Info("update generated")
+		}
 		p.Notify(update)
 	}
 }
@@ -579,4 +661,12 @@ func (p *Provider) findUIRUnsafe(id string) (vatspydata.UIR, error) {
 		return uir, nil
 	}
 	return vatspydata.UIR{}, errNotFound
+}
+
+func (p *Provider) SetAirportTrace(icao string) {
+	p.airportTrace.Add(icao)
+}
+
+func (p *Provider) ResetAirportTrace(icao string) {
+	p.airportTrace.Delete(icao)
 }
