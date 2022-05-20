@@ -73,11 +73,11 @@ func normalizeAtisText(text string) string {
 }
 
 func detectArrivalRunways(atisText string) *set.Set[string] {
+	results := set.New[string]()
 	if atisText != "" {
 		for _, re := range arrivalExpressions {
 			match := re.FindAllStringSubmatch(atisText, -1)
 			if len(match) > 0 {
-				results := set.New[string]()
 				for _, m := range match[0][1:] {
 					if m != "" {
 						results.Add(normalizeIdent(m))
@@ -87,15 +87,15 @@ func detectArrivalRunways(atisText string) *set.Set[string] {
 			}
 		}
 	}
-	return nil
+	return results
 }
 
 func detectDepartureRunways(atisText string) *set.Set[string] {
+	results := set.New[string]()
 	if atisText != "" {
 		for _, re := range departureExpressions {
 			match := re.FindAllStringSubmatch(atisText, -1)
 			if len(match) > 0 {
-				results := set.New[string]()
 				for _, m := range match[0][1:] {
 					if m != "" {
 						results.Add(normalizeIdent(m))
@@ -105,7 +105,7 @@ func detectDepartureRunways(atisText string) *set.Set[string] {
 			}
 		}
 	}
-	return nil
+	return results
 }
 
 func (a *Airport) setActiveRunways() {
