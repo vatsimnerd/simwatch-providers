@@ -215,7 +215,7 @@ loop:
 		case upd := <-rsub.Updates():
 			runwayCount++
 			if runwayCount%1000 == 0 {
-				log.Debugf("accumulated %d updates from ourairports provider", dynamicCount)
+				log.Debugf("accumulated %d updates from ourairports provider", runwayCount)
 			}
 			switch upd.UType {
 			case pubsub.UpdateTypeSet:

@@ -53,8 +53,9 @@ var (
 		),
 	}
 
-	exprSpecial    = regexp.MustCompile(`[^A-Z0-9\s]`)
-	exprWhitespace = regexp.MustCompile(`\s+`)
+	exprSpecial         = regexp.MustCompile(`[^A-Z0-9\s]`)
+	exprWhitespace      = regexp.MustCompile(`\s+`)
+	exprCollapseNumbers = regexp.MustCompile(`(\d)\s+(\d)`)
 )
 
 func normalizeIdent(ident string) string {
@@ -65,10 +66,13 @@ func normalizeIdent(ident string) string {
 	return ident
 }
 
-func normalizeAtisText(text string) string {
+func normalizeAtisText(text string, collapseNumbers bool) string {
 	text = strings.ToUpper(text)
 	text = exprSpecial.ReplaceAllString(text, "")
 	text = exprWhitespace.ReplaceAllString(text, " ")
+	if collapseNumbers {
+		text = exprCollapseNumbers.ReplaceAllString(text, `$1$2`)
+	}
 	return strings.TrimSpace(text)
 }
 
@@ -117,15 +121,22 @@ func (a *Airport) setActiveRunways() {
 		return
 	}
 
-	atisText := normalizeAtisText(a.Controllers.ATIS.TextAtis)
+	atisText := normalizeAtisText(a.Controllers.ATIS.TextAtis, false)
 
 	runways := detectArrivalRunways(atisText)
-
+	if runways.Size() == 0 {
+		collapsed := normalizeAtisText(atisText, true)
+		runways = detectArrivalRunways(collapsed)
+	}
 	for ident, rwy := range a.Runways {
 		rwy.ActiveLnd = runways.Has(ident)
 	}
 
 	runways = detectDepartureRunways(atisText)
+	if runways.Size() == 0 {
+		collapsed := normalizeAtisText(atisText, true)
+		runways = detectDepartureRunways(collapsed)
+	}
 	for ident, rwy := range a.Runways {
 		rwy.ActiveTO = runways.Has(ident)
 	}
