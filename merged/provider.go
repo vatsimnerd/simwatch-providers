@@ -578,7 +578,7 @@ func (p *Provider) setPilot(vp vatsimapi.Pilot) {
 	p.dataLock.Lock()
 	defer p.dataLock.Unlock()
 
-	pilot := Pilot{Pilot: vp}
+	pilot := makePilot(vp)
 	p.pilots[pilot.Callsign] = pilot
 	update := pubsub.Update{UType: pubsub.UpdateTypeSet, OType: ObjectTypePilot, Obj: pilot}
 	p.Notify(update)

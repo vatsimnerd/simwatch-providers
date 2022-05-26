@@ -1,6 +1,9 @@
 package merged
 
 import (
+	"strings"
+
+	"github.com/vatsimnerd/simwatch-providers/merged/aircraft"
 	"github.com/vatsimnerd/simwatch-providers/ourairports"
 	vatsimapi "github.com/vatsimnerd/simwatch-providers/vatsim-api"
 	vatspydata "github.com/vatsimnerd/simwatch-providers/vatspy-data"
@@ -9,6 +12,7 @@ import (
 type (
 	Pilot struct {
 		vatsimapi.Pilot
+		AircraftType *aircraft.AircraftType `json:"aircraft_type"`
 	}
 
 	ControllerSet struct {
@@ -87,4 +91,16 @@ func (r Radar) NE(o Radar) bool {
 	}
 
 	return false
+}
+
+func makePilot(vp vatsimapi.Pilot) Pilot {
+	p := Pilot{Pilot: vp}
+	if p.FlightPlan != nil {
+		tokens := strings.Split(p.FlightPlan.Aircraft, "/")
+		code := tokens[0]
+		if at, found := aircraft.AircraftTypes[code]; found {
+			p.AircraftType = &at
+		}
+	}
+	return p
 }
