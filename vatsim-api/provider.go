@@ -141,12 +141,6 @@ loop:
 			}
 
 			ctrlSet, ctrlDel := mapupdate.Update[Controller, mapupdate.Comparable[Controller]](p.controllers, controllers, &p.dataLock)
-			for _, set := range ctrlSet {
-				log.WithField("callsign", set.Callsign).Warn("SET CONTROLLER")
-			}
-			for _, del := range ctrlDel {
-				log.WithField("callsign", del.Callsign).Warn("DELETE CONTROLLER")
-			}
 			for _, update := range pubsub.MakeUpdates(ctrlSet, ctrlDel, ObjectTypeController) {
 				p.Notify(update)
 			}

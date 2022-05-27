@@ -450,7 +450,6 @@ func (p *Provider) setController(c vatsimapi.Controller) {
 		}
 
 		p.Notify(update)
-		alog.Info("SET AIRPORT")
 	} else if c.Facility == vatsimapi.FacilityRadar {
 
 		firs := make(map[string]vatspydata.FIR, 0)
@@ -500,7 +499,6 @@ func (p *Provider) setController(c vatsimapi.Controller) {
 
 		update := pubsub.Update{UType: pubsub.UpdateTypeSet, OType: ObjectTypeRadar, Obj: radar}
 		p.Notify(update)
-		clog.Info("RADAR SET")
 
 	} else {
 		clog.WithField("facility", c.Facility).Error("invalid facility")
@@ -561,13 +559,11 @@ func (p *Provider) deleteController(c vatsimapi.Controller) {
 			alog.WithField("update", update).Info("update generated")
 		}
 		p.Notify(update)
-		alog.Info("SET AIRPORT")
 	} else if c.Facility == vatsimapi.FacilityRadar {
 		if radar, found := p.radars[c.Callsign]; found {
 			delete(p.radars, c.Callsign)
 			update := pubsub.Update{UType: pubsub.UpdateTypeDelete, OType: ObjectTypeRadar, Obj: radar}
 			p.Notify(update)
-			clog.Info("DELETE RADAR")
 		}
 	} else {
 		clog.WithField("facility", c.Facility).Error("invalid facility")
@@ -582,7 +578,6 @@ func (p *Provider) setPilot(vp vatsimapi.Pilot) {
 	p.pilots[pilot.Callsign] = pilot
 	update := pubsub.Update{UType: pubsub.UpdateTypeSet, OType: ObjectTypePilot, Obj: pilot}
 	p.Notify(update)
-	log.WithField("callsign", vp.Callsign).Info("SET PILOT")
 }
 
 func (p *Provider) deletePilot(vp vatsimapi.Pilot) {
@@ -592,7 +587,6 @@ func (p *Provider) deletePilot(vp vatsimapi.Pilot) {
 		delete(p.pilots, vp.Callsign)
 		update := pubsub.Update{UType: pubsub.UpdateTypeDelete, OType: ObjectTypePilot, Obj: ex}
 		p.Notify(update)
-		log.WithField("callsign", vp.Callsign).Info("DELETE PILOT")
 	}
 }
 
