@@ -96,7 +96,7 @@ func (p Pilot) NE(o Pilot) bool {
 		return false
 	}
 
-	return *p.FlightPlan != *o.FlightPlan
+	return *(p.FlightPlan) != *(o.FlightPlan)
 }
 
 func parseFrequency(frequency string) (float64, error) {
